@@ -52,7 +52,7 @@ public class PostFileToServer extends AsyncTask<Result, Result, Result> {
 
     @Override
     protected Result doInBackground(Result... results) {
-        // String rs = "{\"success\": true,\"data\":\"https://lamgiaubeauty.ezs.vn/app/image/3M.jpg?t=1\"}";
+        // String rs = "{\"success\": true,\"data\":\"https://cser.vn/app/image/3M.jpg?t=1\"}";
 
         Result rs = new Result();
 

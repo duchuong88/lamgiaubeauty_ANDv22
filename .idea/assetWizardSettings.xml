@@ -102,7 +102,7 @@
                                             <option name="values">
                                               <map>
                                                 <entry key="color" value="000000" />
-                                                <entry key="imagePath" value="C:\Users\admin\Documents\Downloads\lamgiaubeauty.ezs.vn\Media\Logo_goc.png" />
+                                                <entry key="imagePath" value="C:\Users\admin\Documents\Downloads\lamgiau.ezs.vn\media\Logo.png" />
                                                 <entry key="scalingPercent" value="66" />
                                               </map>
                                             </option>
@@ -165,7 +165,7 @@
                                             <option name="values">
                                               <map>
                                                 <entry key="color" value="000000" />
-                                                <entry key="imagePath" value="C:\Users\admin\Documents\Downloads\lamgiaubeauty.ezs.vn\Media\Logo_goc.png" />
+                                                <entry key="imagePath" value="C:\Users\admin\Documents\Downloads\lamgiau.ezs.vn\media\Logo.png" />
                                               </map>
                                             </option>
                                           </PersistentState>
@@ -198,7 +198,7 @@
                                   <option name="values">
                                     <map>
                                       <entry key="assetType" value="IMAGE" />
-                                      <entry key="imageAsset" value="C:\Users\admin\Documents\Downloads\lamgiaubeauty.ezs.vn\Media\Logo_goc.png" />
+                                      <entry key="imageAsset" value="C:\Users\admin\Documents\Downloads\lamgiau.ezs.vn\media\Logo.png" />
                                     </map>
                                   </option>
                                 </PersistentState>
@@ -227,7 +227,7 @@
                                             <option name="values">
                                               <map>
                                                 <entry key="color" value="000000" />
-                                                <entry key="imagePath" value="C:\Users\admin\Documents\Downloads\lamgiaubeauty.ezs.vn\Media\Logo_goc.png" />
+                                                <entry key="imagePath" value="C:\Users\admin\Documents\Downloads\lamgiau.ezs.vn\media\Logo.png" />
                                                 <entry key="paddingPercent" value="-10" />
                                               </map>
                                             </option>
@@ -261,7 +261,7 @@
                                   <option name="values">
                                     <map>
                                       <entry key="assetType" value="IMAGE" />
-                                      <entry key="imageAsset" value="C:\Users\admin\Documents\Downloads\lamgiaubeauty.ezs.vn\Media\Logo_goc.png" />
+                                      <entry key="imageAsset" value="C:\Users\admin\Documents\Downloads\lamgiau.ezs.vn\media\Logo.png" />
                                     </map>
                                   </option>
                                 </PersistentState>

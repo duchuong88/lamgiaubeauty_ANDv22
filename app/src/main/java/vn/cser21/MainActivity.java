@@ -1,6 +1,9 @@
 package lamgiaubeauty.ezs;
 
+import android.app.AlertDialog;
+import android.content.pm.PackageInfo;
 import android.content.res.AssetManager;
+import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 
@@ -12,6 +15,11 @@ import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
+import android.graphics.Canvas;
+import android.graphics.LinearGradient;
+import android.graphics.Paint;
+import android.graphics.Shader;
+import android.graphics.drawable.BitmapDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
@@ -26,21 +34,30 @@ import androidx.annotation.RequiresApi;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentTransaction;
+import androidx.core.graphics.Insets;
 
+import android.provider.Settings;
 import android.view.MotionEvent;
 import android.view.Window;
 import android.view.WindowManager;
+import android.webkit.CookieManager;
 import android.webkit.JavascriptInterface;
 import android.view.View;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
+import android.webkit.WebStorage;
 import android.webkit.WebViewClient;
 
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
+import com.google.firebase.FirebaseApp;
 import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.gson.Gson;
 
@@ -68,7 +85,6 @@ import lamgiaubeauty.ezs.incoming.CallNotEndEvent;
 import lamgiaubeauty.ezs.incoming.IncomingCallActivity;
 import lamgiaubeauty.ezs.incoming.IncomingEvent;
 
-
 /*
 Thay đổi cấu hình cho từng app
 bao gồm:
@@ -91,6 +107,8 @@ public class MainActivity extends AppCompatActivity implements EasyPermissions.P
     //Upload Var
     private float m_downX;
     private static final int STORAGE_PERMISSION_CODE = 123;
+
+    private static final int REQUEST_NOTI_PERMISSION = 202;
     private final static int FILECHOOSER_RESULTCODE = 1;
     private ValueCallback<Uri[]> mUploadMessage;
 
@@ -189,10 +207,14 @@ public class MainActivity extends AppCompatActivity implements EasyPermissions.P
 
                         View v = w.getDecorView();
 
+                        WindowInsetsControllerCompat controller =
+                                new WindowInsetsControllerCompat(getWindow(), getWindow().getDecorView());
 
                         if (textStatusBarWhite)
+                            //controller.setAppearanceLightStatusBars(true);
                             v.setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
                         else
+                            //controller.setAppearanceLightStatusBars(false);
                             v.setSystemUiVisibility(0);
                     }
                 });
@@ -298,11 +320,48 @@ public class MainActivity extends AppCompatActivity implements EasyPermissions.P
         });
     }
 
+    public static int dpToPx(int dp) {
+        return (int) (dp / Resources.getSystem().getDisplayMetrics().density);
+    }
+
+    public int getStatusBarHeight() {
+        int result = 0;
+        int resourceId = getResources().getIdentifier("status_bar_height", "dimen", "android");
+        if (resourceId > 0) {
+            result = dpToPx(getResources().getDimensionPixelSize(resourceId));
+        }
+        return result;
+    }
+
+    public int getNavigationBarHeight() {
+        Context context = this;
+        Resources resources = context.getResources();
+        int resourceId = resources.getIdentifier("navigation_bar_height", "dimen", "android");
+        if (resourceId > 0) {
+            return dpToPx(resources.getDimensionPixelSize(resourceId));
+        }
+        return 0;
+    }
+
     private Bitmap getBitmapFromAsset(String strName) throws IOException {
         AssetManager assetManager = getAssets();
         InputStream istr = assetManager.open(strName);
         Bitmap bitmap = BitmapFactory.decodeStream(istr);
         return bitmap;
+    }
+
+    private long getSafeVersionCode(Context context) {
+        try {
+            PackageInfo pInfo = context.getPackageManager().getPackageInfo(context.getPackageName(), 0);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                return pInfo.getLongVersionCode(); // gồm versionCodeMajor
+            } else {
+                return pInfo.versionCode;
+            }
+        } catch (PackageManager.NameNotFoundException e) {
+            e.printStackTrace();
+            return -1;
+        }
     }
 
     @SuppressLint({"ClickableViewAccessibility", "WrongViewCast"})
@@ -311,6 +370,37 @@ public class MainActivity extends AppCompatActivity implements EasyPermissions.P
 
         //go
         super.onCreate(savedInstanceState);
+
+        SharedPreferences prefs = getSharedPreferences("AppPrefs", MODE_PRIVATE);
+
+        long savedVersionCode = prefs.getLong("lastVersionCode", -1);
+        long currentVersionCode = getSafeVersionCode(this);
+
+        PackageInfo pInfo = null;
+        try {
+            pInfo = getPackageManager().getPackageInfo(getPackageName(), 0);
+        } catch (PackageManager.NameNotFoundException e) {
+            e.printStackTrace();
+        }
+
+        long firstInstallTime = (pInfo != null) ? pInfo.firstInstallTime : 0;
+        long lastUpdateTime = (pInfo != null) ? pInfo.lastUpdateTime : 0;
+
+        // Xác định trạng thái
+        boolean isNewInstall = false;
+        boolean isUpdate = false;
+
+        if (savedVersionCode == -1) {
+            if (firstInstallTime == lastUpdateTime) {
+                // App vừa được cài mới
+                isNewInstall = true;
+            } else {
+                // App cập nhật từ bản cũ chưa từng lưu versionCode
+                isUpdate = true;
+            }
+        } else if (currentVersionCode > savedVersionCode) {
+            isUpdate = true;
+        }
 
         if (!isTaskRoot() && (getIntent().hasCategory(Intent.CATEGORY_LAUNCHER) || getIntent().hasCategory(Intent.CATEGORY_INFO))
                 && Intent.ACTION_MAIN.equals(getIntent().getAction())) {
@@ -324,40 +414,111 @@ public class MainActivity extends AppCompatActivity implements EasyPermissions.P
         }
 
         setContentView(R.layout.activity_main);
+        FirebaseApp.initializeApp(getApplicationContext());
 
-        // Get Token Key
+//        FirebaseMessaging.getInstance().getToken()
+//                .addOnCompleteListener(task -> {
+//                    if (!task.isSuccessful()) {
+//                        Log.w("🔥 FCM TOKEN", "Fetching FCM registration token failed", task.getException());
+//                        return;
+//                    }
+//
+//                    // Lấy token hiện tại
+//                    String token = task.getResult();
+//                    Log.e("🔥 FCM TOKEN", "Current token: " + token);
+//
+//                    // Lưu lại để bạn dùng cho send test
+//                    SharedPreferences prefsNow = getSharedPreferences(getPackageName(), MODE_PRIVATE);
+//                    prefsNow.edit().putString("FirebaseNotiToken", token).apply();
+//                });
 
-        FirebaseMessaging.getInstance().getToken()
-                .addOnCompleteListener(new OnCompleteListener<String>() {
-                    @Override
-                    public void onComplete(@NonNull Task<String> task) {
-                        if (!task.isSuccessful()) {
-                            Log.w(TAG, "Fetching FCM registration token failed", task.getException());
-                            return;
-                        }
 
-                        // Get new FCM registration token
-                        String token = task.getResult();
-                        String name = getPackageName();
-                        SharedPreferences sharedPref = getSharedPreferences(name, Context.MODE_PRIVATE);
-                        SharedPreferences.Editor editor = sharedPref.edit();
-                        editor.putString("FirebaseNotiToken", token);
-                        editor.commit();
-                    }
-                });
+        View root = findViewById(R.id.layout);
+        root.post(() -> {
+            int w = root.getWidth();
+            int h = root.getHeight();
+
+            int solidHeight = (int) (h * 0.2f);   // 20% hồng đặc
+            int fadeHeight  = (int) (h * 0.2f);   // 20% fade
+            int whiteStart  = solidHeight + fadeHeight; // bắt đầu vùng trắng đặc
+
+            Bitmap bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+            Canvas canvas = new Canvas(bmp);
+            Paint paint = new Paint();
+            paint.setStyle(Paint.Style.FILL);
+
+            paint.setColor(ContextCompat.getColor(this, R.color.colorApp));
+            canvas.drawRect(0, 0, w, solidHeight, paint);
+
+            LinearGradient gradient = new LinearGradient(
+                    0, solidHeight, 0, solidHeight + fadeHeight,
+                    ContextCompat.getColor(this, R.color.colorApp), Color.WHITE,
+                    Shader.TileMode.CLAMP
+            );
+            paint.setShader(gradient);
+            canvas.drawRect(0, solidHeight, w, solidHeight + fadeHeight, paint);
+            paint.setShader(null);
+
+            paint.setColor(Color.WHITE);
+            canvas.drawRect(0, whiteStart, w, h, paint);
+
+            root.setBackground(new BitmapDrawable(root.getResources(), bmp));
+        });
+
+        //WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
+
+
+        ViewCompat.setOnApplyWindowInsetsListener(root, (v, insets) -> {
+            Insets sys = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+            Insets ime = insets.getInsets(WindowInsetsCompat.Type.ime());
+
+            int left   = sys.left;
+            int top    = sys.top;
+            int right  = sys.right;
+            int bottom = Math.max(sys.bottom, ime.bottom);
+
+            v.setPadding(left, top, right, bottom);
+
+            return insets; // chỉ apply padding
+        });
+
 
         //loadr
 
         //
         wv = (WebView) this.findViewById(R.id.wv);
         ANDROID = new ANDROID(this);
+
+        // 👉 Chỉ xoá dữ liệu nếu thực sự là cài mới (không phải update)
+        if (isNewInstall) {
+            WebStorage.getInstance().deleteAllData();
+            wv.clearCache(true);
+            wv.clearFormData();
+            wv.clearHistory();
+
+//            FirebaseMessaging.getInstance().deleteToken()
+//                    .addOnCompleteListener(task -> {
+//                        if (task.isSuccessful()) {
+//                            Log.d("FCM", "Đã xoá Firebase token cũ");
+//                        } else {
+//                            Log.w("FCM", "Xoá token thất bại", task.getException());
+//                        }
+//                    });
+
+            Log.d("Init", "Lần đầu cài mới → xoá WebView data");
+
+        } else if (isUpdate) {
+            Log.d("Init", "Cập nhật từ bản cũ → giữ nguyên LocalStorage");
+        } else {
+            Log.d("Init", "Chạy lại app bình thường → giữ nguyên dữ liệu");
+        }
+
+        // ✅ Lưu versionCode mới vào SharedPreferences (dùng long)
+        prefs.edit().putLong("lastVersionCode", currentVersionCode).apply();
+
         wv.setBackgroundColor(Color.TRANSPARENT);
 
-        //Luôn để mầu trắng
-        //setBackground(null);
-
         wv.addJavascriptInterface(ANDROID, "ANDROID");
-
 
         WebSettings setting = wv.getSettings();
         //enble all
@@ -405,7 +566,6 @@ public class MainActivity extends AppCompatActivity implements EasyPermissions.P
             wv.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
         }
 
-
         //Mỗi một app có 1 domain riêng
         String domain = getString(R.string.app_domain);
         @SuppressLint("ResourceType")
@@ -424,7 +584,9 @@ public class MainActivity extends AppCompatActivity implements EasyPermissions.P
         Gson gson = new Gson();
 
         String jsonExtras = extras == null ? "{}" : gson.toJson(mapBundle(extras));
-        html = html.replace("<body>", "<body><script> var ANDROID_EXTRAS =" + jsonExtras + " </script>");
+
+        //html = html.replace("<body>", "<body><script> var ANDROID_EXTRAS =" + jsonExtras + "; document.documentElement.style.setProperty('--f7-safe-area-top', '" + getStatusBarHeight() + "px'); document.documentElement.style.setProperty('--f7-safe-area-bottom', '" + getNavigationBarHeight() + "px')</script>");
+        html = html.replace("<body>", "<body><script> var ANDROID_EXTRAS =" + jsonExtras + ";</script>");
 
         Log.d("jsonExtras", jsonExtras);
         //DEV Remove
@@ -435,24 +597,65 @@ public class MainActivity extends AppCompatActivity implements EasyPermissions.P
         //wv.loadUrl("https://ezs.vn/");
         //DEV Open
 
-        getNotificationPermission();
+        checkAndRequestNotificationPermission();
     }
 
-    public void getNotificationPermission(){
-        try {
-            if (Build.VERSION.SDK_INT > 32) {
-                ActivityCompat.requestPermissions(this,
-                        new String[]{Manifest.permission.POST_NOTIFICATIONS},
-                        202);
-            }
-        }catch (Exception e){
+    private void checkAndRequestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            int permission = ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS);
 
+            if (permission != PackageManager.PERMISSION_GRANTED) {
+                // Nếu từng bị từ chối → hiển thị dialog hướng dẫn bật thủ công
+                if (ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.POST_NOTIFICATIONS)) {
+                    showNotificationSettingsDialog();
+                } else {
+                    // Chưa từng xin → xin quyền
+                    ActivityCompat.requestPermissions(
+                            this,
+                            new String[]{Manifest.permission.POST_NOTIFICATIONS},
+                            REQUEST_NOTI_PERMISSION
+                    );
+                }
+            } else {
+                Log.d("NotificationPermission", "✅ Đã có quyền POST_NOTIFICATIONS");
+            }
+        } else {
+            Log.d("NotificationPermission", "Không cần xin quyền (Android < 13)");
         }
     }
+
+    /**
+     * Hiển thị dialog mở Cài đặt khi quyền đã bị từ chối
+     */
+    private void showNotificationSettingsDialog() {
+        new AlertDialog.Builder(this)
+                .setTitle("Bật thông báo")
+                .setMessage("Ứng dụng cần quyền gửi thông báo để hiển thị tin nhắn, cuộc gọi đến, v.v. Bạn có muốn mở phần Cài đặt để bật lại không?")
+                .setPositiveButton("Mở cài đặt", (dialog, which) -> openNotificationSettings())
+                .setNegativeButton("Để sau", null)
+                .show();
+    }
+
+    /**
+     * Mở phần cài đặt thông báo của ứng dụng trong hệ thống
+     */
+    private void openNotificationSettings() {
+        Intent intent;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            intent = new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                    .putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName());
+        } else {
+            intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                    .setData(Uri.parse("package:" + getPackageName()));
+        }
+        startActivity(intent);
+    }
+
 
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
+
         if (intent.getStringExtra("NOTI_ID") != null)
             if (!intent.getStringExtra("NOTI_ID").isEmpty()) {
                 Intent start = intent;
@@ -622,7 +825,7 @@ public class MainActivity extends AppCompatActivity implements EasyPermissions.P
 
     private void initWebView() {
         wv.setWebViewClient(new Callback());
-        //wv.loadUrl("https://lamgiaubeauty.ezs.vn/");
+        //wv.loadUrl("https://cser.vn/");
         wv.setWebChromeClient(new WebChromeClient() {
             //For Android 3.0+
             public void openFileChooser(ValueCallback<Uri> uploadMsg) {
